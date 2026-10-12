@@ -1,0 +1,20 @@
+services:
+  runelite-web:
+    build: .
+    image: runelite-web
+    ports:
+      - "8080:8080"
+    environment:
+      # Required. Put it in a .env file next to this one: RLWEB_PASSWORD=...
+      RLWEB_PASSWORD: ${RLWEB_PASSWORD:?Set RLWEB_PASSWORD in .env}
+      # Starting size of the virtual screen; phones resize it automatically.
+      RLWEB_GEOMETRY: 1280x720
+      # Set to 1 when serving over HTTPS (e.g. behind Tailscale or Caddy).
+      RLWEB_SECURE_COOKIE: "0"
+    volumes:
+      - rlweb-data:/data
+    shm_size: 512m
+    restart: unless-stopped
+
+volumes:
+  rlweb-data:

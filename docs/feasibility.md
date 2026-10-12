@@ -15,6 +15,10 @@ and handheld devices, with touch controls close to the official OSRS mobile clie
 The rest of this document explains how we reached this verdict, then sketches the
 architecture for approach B.
 
+> **Status:** approach B is implemented in this repository. See the [README](../README.md).
+> The first version streams video over VNC (noVNC) instead of WebRTC, which is simpler
+> and fast enough for OSRS's 600 ms ticks. WebRTC remains a possible upgrade.
+
 ---
 
 ## 1. The constraints that decide this

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#111111" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" />
+    <title>RuneLite Web</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        background: #111;
+        color: #eee;
+        font:
+          16px/1.4 system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+      }
+      form {
+        width: min(340px, calc(100vw - 32px));
+        display: grid;
+        gap: 12px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      input,
+      button {
+        min-height: 48px;
+        padding: 0 12px;
+        border-radius: 10px;
+        border: 1px solid #444;
+        background: #222;
+        color: #eee;
+        font: inherit;
+      }
+      button {
+        background: #ff9b2f;
+        border-color: #ff9b2f;
+        color: #000;
+        font-weight: 600;
+      }
+      .error {
+        color: #ff7b7b;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <form method="post" action="login">
+      <h1>RuneLite Web</h1>
+      <p class="error" id="error" hidden>Wrong password.</p>
+      <input
+        name="password"
+        type="password"
+        autocomplete="current-password"
+        placeholder="Password"
+        aria-label="Password"
+        required
+        autofocus
+      />
+      <button type="submit">Sign in</button>
+    </form>
+    <script>
+      if (new URLSearchParams(location.search).has('error')) document.getElementById('error').hidden = false;
+    </script>
+  </body>
+</html>

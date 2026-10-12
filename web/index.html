@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#111111" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" />
+    <link rel="apple-touch-icon" href="icon.svg" />
+    <link rel="stylesheet" href="css/app.css" />
+    <title>RuneLite Web</title>
+  </head>
+  <body data-toolbar-side="left">
+    <div id="stage"><div id="screen"></div></div>
+    <div id="touch" aria-label="Game"></div>
+    <div id="ring" hidden></div>
+    <div id="status" role="status" hidden></div>
+
+    <input
+      id="kbd"
+      type="text"
+      aria-label="Keyboard input"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
+      enterkeyhint="send"
+    />
+
+    <nav id="toolbar" aria-label="Controls">
+      <button id="btn-collapse" type="button" title="Hide controls" aria-label="Hide controls">☰</button>
+      <div class="tools">
+        <button id="btn-kbd" type="button" title="Keyboard" aria-label="Keyboard">⌨</button>
+        <button id="btn-menu" type="button" title="Next tap opens the menu" aria-label="Menu mode" aria-pressed="false">
+          ☷
+        </button>
+        <button id="btn-shift" type="button" title="Hold Shift" aria-label="Shift" aria-pressed="false">⇧</button>
+        <button id="btn-ctrl" type="button" title="Hold Ctrl" aria-label="Ctrl" aria-pressed="false">Ctl</button>
+        <button id="btn-esc" type="button" title="Escape" aria-label="Escape">Esc</button>
+        <button id="btn-fkeys" type="button" title="F-keys" aria-label="F-keys" aria-pressed="false">Fn</button>
+        <button id="btn-fullscreen" type="button" title="Full screen" aria-label="Full screen">⛶</button>
+        <button id="btn-settings" type="button" title="Settings" aria-label="Settings">⚙</button>
+      </div>
+    </nav>
+    <div id="fkeys" hidden></div>
+
+    <dialog id="settings">
+      <form id="settings-form" method="dialog">
+        <h2>Settings</h2>
+
+        <fieldset>
+          <legend>Profile</legend>
+          <div class="row">
+            <select id="profile-select" aria-label="Profile"></select>
+            <button id="profile-new" type="button">Save as…</button>
+            <button id="profile-delete" type="button">Delete</button>
+          </div>
+          <p class="hint">
+            Profiles are saved on your host and shared by all your devices. RuneLite's own settings and plugins are
+            saved by RuneLite itself.
+          </p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Touch</legend>
+          <label
+            >Long-press time <output></output> ms
+            <input name="longPressMs" type="range" min="200" max="1000" step="50" />
+          </label>
+          <label
+            >Camera drag speed <output></output>×
+            <input name="dragSensitivity" type="range" min="0.5" max="3" step="0.1" />
+          </label>
+          <label
+            >Tap movement tolerance <output></output> px
+            <input name="tapSlopPx" type="range" min="4" max="30" step="1" />
+          </label>
+          <label
+            >Pinch zoom step <output></output> px
+            <input name="pinchStepPx" type="range" min="15" max="100" step="5" />
+          </label>
+          <label class="check"><input name="haptics" type="checkbox" /> Vibrate on long-press (Android)</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Display</legend>
+          <label
+            >Mode
+            <select name="displayMode">
+              <option value="resize">Resize RuneLite to fit this screen</option>
+              <option value="fit">Scale the whole desktop to fit</option>
+            </select>
+          </label>
+          <label
+            >Resolution scale (resize mode) <output></output>×
+            <input name="resolutionScale" type="range" min="1" max="3" step="0.1" />
+          </label>
+          <label
+            >Image quality <output></output>
+            <input name="quality" type="range" min="0" max="9" step="1" />
+          </label>
+          <label
+            >Controls side
+            <select name="toolbarSide">
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </label>
+          <label class="check"><input name="showFKeys" type="checkbox" /> Show F-key bar</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Manage</legend>
+          <div class="row">
+            <button id="settings-export" type="button">Export profiles</button>
+            <label class="button"
+              >Import profiles<input id="settings-import" type="file" accept="application/json" hidden
+            /></label>
+          </div>
+          <div class="row">
+            <button id="runelite-restart" type="button">Restart RuneLite</button>
+            <button type="submit" formaction="logout" formmethod="post">Log out</button>
+          </div>
+        </fieldset>
+
+        <div class="row end">
+          <button type="submit" value="cancel">Cancel</button>
+          <button id="settings-save" type="button" class="primary">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
