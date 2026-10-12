@@ -98,6 +98,41 @@ class ServerTest(AioHTTPTestCase):
         self.assertEqual(rlweb.load_secret(Path(self.tmp.name)), key)
 
 
+class BasePathTest(AioHTTPTestCase):
+    """Served at play.example.com/kyle/ behind a proxy that strips /kyle."""
+
+    async def get_application(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.env = {
+            "RLWEB_DATA": self.tmp.name,
+            "RLWEB_PASSWORD": PASSWORD,
+            "RLWEB_BASE_PATH": "kyle",
+            "RLWEB_NOVNC_ROOT": str(Path(self.tmp.name) / "missing"),
+        }
+        return rlweb.create_app(rlweb.Config(self.env))
+
+    async def asyncTearDown(self):
+        await super().asyncTearDown()
+        self.tmp.cleanup()
+
+    async def test_redirects_and_cookie_use_base_path(self):
+        resp = await self.client.get("/", allow_redirects=False)
+        self.assertEqual(resp.headers["Location"], "/kyle/login")
+        resp = await self.client.post("/login", data={"password": "nope"}, allow_redirects=False)
+        self.assertEqual(resp.headers["Location"], "/kyle/login?error=1")
+        resp = await self.client.post("/login", data={"password": PASSWORD}, allow_redirects=False)
+        self.assertEqual(resp.headers["Location"], "/kyle/")
+        self.assertEqual(resp.cookies[rlweb.COOKIE_NAME]["path"], "/kyle/")
+
+    async def test_changing_password_ends_sessions(self):
+        resp = await self.client.post("/login", data={"password": PASSWORD}, allow_redirects=False)
+        token = resp.cookies[rlweb.COOKIE_NAME].value
+        same = rlweb.create_app(rlweb.Config(self.env))
+        changed = rlweb.create_app(rlweb.Config({**self.env, "RLWEB_PASSWORD": "a new password"}))
+        self.assertTrue(rlweb.session_valid(same[rlweb.SECRET], token))
+        self.assertFalse(rlweb.session_valid(changed[rlweb.SECRET], token))
+
+
 class InputValidationTest(unittest.TestCase):
     class FakeX:
         def __init__(self):

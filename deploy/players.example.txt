@@ -1,0 +1,4 @@
+# One player per line: lowercase letters, digits and dashes.
+# Each becomes https://<domain>/<name>/ with its own RuneLite and password.
+kyle
+friend-one

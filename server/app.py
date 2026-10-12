@@ -46,6 +46,10 @@ class Config:
         self.runelite_pidfile = Path(env.get("RLWEB_RUNELITE_PIDFILE", "/tmp/runelite.pid"))
         self.secure_cookie = env.get("RLWEB_SECURE_COOKIE", "0") == "1"
         self.password = env.get("RLWEB_PASSWORD", "")
+        # URL prefix when served under a path, e.g. "/kyle/" behind a reverse
+        # proxy that strips it. Used for redirects and the cookie path.
+        prefix = env.get("RLWEB_BASE_PATH", "").strip("/")
+        self.base_path = f"/{prefix}/" if prefix else "/"
 
 
 def load_secret(data_dir):
@@ -57,6 +61,11 @@ def load_secret(data_dir):
     path.write_bytes(key)
     path.chmod(0o600)
     return key
+
+
+def session_key(secret, password):
+    """Binds sessions to the password, so changing it signs everyone out."""
+    return hmac.new(secret, password.encode(), hashlib.sha256).digest()
 
 
 def sign_session(secret, expires):
@@ -89,7 +98,7 @@ async def auth_middleware(request, handler):
     if not session_valid(app[SECRET], request.cookies.get(COOKIE_NAME)):
         if request.path.startswith(("/api/", "/ws/")):
             raise web.HTTPUnauthorized()
-        raise web.HTTPFound("/login")
+        raise web.HTTPFound(app[CONFIG].base_path + "login")
     if request.method != "GET" or request.path.startswith("/ws/"):
         if not same_origin(request):
             raise web.HTTPForbidden(text="cross-origin request rejected")
@@ -121,13 +130,14 @@ async def login_submit(request):
         # Slow down guessing; the lock makes concurrent attempts queue up.
         async with request.app[LOGIN_LOCK]:
             await asyncio.sleep(1.5)
-        raise web.HTTPFound("/login?error=1")
+        raise web.HTTPFound(request.app[CONFIG].base_path + "login?error=1")
     token = sign_session(request.app[SECRET], int(time.time()) + SESSION_TTL)
-    response = web.HTTPFound("/")
+    response = web.HTTPFound(request.app[CONFIG].base_path)
     response.set_cookie(
         COOKIE_NAME,
         token,
         max_age=SESSION_TTL,
+        path=request.app[CONFIG].base_path,
         httponly=True,
         samesite="Strict",
         secure=request.app[CONFIG].secure_cookie or request.secure,
@@ -136,8 +146,9 @@ async def login_submit(request):
 
 
 async def logout(request):
-    response = web.HTTPFound("/login")
-    response.del_cookie(COOKIE_NAME)
+    base_path = request.app[CONFIG].base_path
+    response = web.HTTPFound(base_path + "login")
+    response.del_cookie(COOKIE_NAME, path=base_path)
     raise response
 
 
@@ -265,7 +276,7 @@ def create_app(config):
     config.data_dir.mkdir(parents=True, exist_ok=True)
     app = web.Application(middlewares=[headers_middleware, auth_middleware])
     app[CONFIG] = config
-    app[SECRET] = load_secret(config.data_dir)
+    app[SECRET] = session_key(load_secret(config.data_dir), config.password)
     app[LOGIN_LOCK] = asyncio.Lock()
     app.router.add_get("/login", login_page)
     app.router.add_post("/login", login_submit)

@@ -28,9 +28,10 @@ laptop or remote desktop does.
 See [docs/feasibility.md](docs/feasibility.md) for why this streams the client instead
 of porting RuneLite to WebAssembly.
 
-> **Use it for yourself only.** Jagex permits RuneLite but has not said anything about
-> streaming it. Run one instance per player, on your own hardware. Don't offer this as
-> a service to other people.
+> **Hosting for friends?** See [deploy/README.md](deploy/README.md). It gives each
+> person their own RuneLite at `play.yourdomain.com/<name>/` with automatic HTTPS. Read
+> its risks section first: Jagex hasn't said anything about streaming RuneLite, and
+> whoever runs the server can reach every player's logged-in game.
 
 ## Quick start
 
@@ -131,6 +132,7 @@ untouched:
 | `RLWEB_SECURE_COOKIE` | `0` | Set to `1` when served over HTTPS |
 | `RUNELITE_ARGS` | (empty) | Extra launcher arguments |
 | `RLWEB_PORT` | `8080` | Web server port inside the container |
+| `RLWEB_BASE_PATH` | `/` | URL prefix when a reverse proxy serves the app under a path (for example `/kyle/`) |
 
 Data lives on the `rlweb-data` volume. `/data/home/.runelite` holds RuneLite's own data.
 `/data/rlweb` holds web profiles and the session signing key.

@@ -3,3 +3,4 @@ docs
 tests
 node_modules
 *.md
+deploy
