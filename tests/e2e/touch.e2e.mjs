@@ -147,6 +147,53 @@ const saved = await page.evaluate(async () => {
 });
 assert.deepEqual(Object.keys(saved.profiles).sort(), ['Bossing', 'Default']);
 
+// Jagex Account: load credentials.properties on the device; RuneLite restarts
+// with the session, and the page restores it after RuneLite loses it.
+const envLines = () =>
+  readFileSync(PROBE_LOG, 'utf8')
+    .split('\n')
+    .filter((l) => l.startsWith('env '));
+async function waitForEnvLine(count) {
+  for (let i = 0; i < 60 && envLines().length < count; i++) await sleep(250);
+  return envLines();
+}
+page.on('dialog', (d) => d.accept());
+const startsBefore = envLines().length;
+assert.match(envLines().at(-1), /JX_DISPLAY_NAME=null RLWEB_PASSWORD=absent/);
+await page.touchscreen.tap(...(await center('#btn-settings')));
+await page.setInputFiles('#jagex-file', {
+  name: 'credentials.properties',
+  mimeType: 'text/plain',
+  buffer: Buffer.from('#test\nJX_CHARACTER_ID=42\nJX_SESSION_ID=test-session\nJX_DISPLAY_NAME=Probe\\ Player\n'),
+});
+let envs = await waitForEnvLine(startsBefore + 1);
+assert.equal(envs.at(-1), 'env JX_DISPLAY_NAME=Probe Player RLWEB_PASSWORD=absent', 'session passed to RuneLite');
+const stored = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('rlweb.jagexSession')));
+assert.equal(stored.length, 1, 'session saved on the device');
+
+// Reloading while RuneLite has the session must not restart it.
+await page.reload();
+await page.waitForFunction(() => document.querySelector('#screen canvas')?.width > 0);
+await sleep(1500);
+assert.equal(envLines().length, startsBefore + 1, 'no restart when already active');
+
+// After "Restart RuneLite" from the server side without a session (as after a
+// reboot), opening the page sends the device's session again.
+await page.evaluate(() => fetch('api/runelite/session', { method: 'DELETE' }));
+await waitForEnvLine(startsBefore + 2);
+await page.reload();
+envs = await waitForEnvLine(startsBefore + 3);
+assert.equal(envs.at(-1), 'env JX_DISPLAY_NAME=Probe Player RLWEB_PASSWORD=absent', 'session restored from device');
+
+// Removing it clears the device and restarts RuneLite without it.
+await page.waitForFunction(() => document.querySelector('#screen canvas')?.width > 0);
+await page.touchscreen.tap(...(await center('#btn-settings')));
+await page.click('#jagex-remove');
+envs = await waitForEnvLine(startsBefore + 4);
+assert.match(envs.at(-1), /JX_DISPLAY_NAME=null/);
+assert.equal(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('rlweb.jagex')).length), 0);
+await page.keyboard.press('Escape');
+
 if (SCREENSHOT) {
   await page.keyboard.press('Escape');
   await page.screenshot({ path: SCREENSHOT });

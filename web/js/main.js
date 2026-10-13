@@ -1,5 +1,6 @@
 import RFB from '../novnc/core/rfb.js';
 import { GestureEngine } from './gestures.js';
+import { DeviceSession, sessionFromCredentials } from './jagex.js';
 import { Keyboard } from './keyboard.js';
 import { PROFILE_DEFAULTS, ProfileStore } from './profiles.js';
 
@@ -382,6 +383,44 @@ $('#runelite-restart').addEventListener('click', async () => {
   dialog.close();
 });
 
+// ------------------------------------------------------------- Jagex Account
+
+// Several players can share one site (play.example.com/<name>/), so scope the
+// saved session to this player's path.
+const jagex = new DeviceSession(new URL('.', location.href).pathname);
+
+function showJagexStatus() {
+  const name = jagex.displayName;
+  $('#jagex-status').textContent = name ? `Saved on this device: ${name}` : 'Not saved on this device.';
+  $('#jagex-remove').hidden = !name;
+}
+
+$('#jagex-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const session = sessionFromCredentials(await file.text());
+    if (!confirm(`Save ${session.JX_DISPLAY_NAME || 'this account'} on this device and restart RuneLite with it?`))
+      return;
+    await jagex.save(session);
+    showJagexStatus();
+    dialog.close();
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+$('#jagex-remove').addEventListener('click', async () => {
+  if (!confirm('Remove your Jagex Account from this device? RuneLite will restart and log out.')) return;
+  try {
+    await jagex.remove();
+  } catch (err) {
+    alert(err.message);
+  }
+  showJagexStatus();
+});
+
 // --------------------------------------------------------------------- start
 
 function releaseAll() {
@@ -403,4 +442,8 @@ document.addEventListener('visibilitychange', () => {
 await profiles.load();
 settings = profiles.active;
 applySettings();
+showJagexStatus();
 connectVideo();
+// If RuneLite restarted (for example after a server reboot), hand it this
+// device's saved session again.
+jagex.syncIfNeeded().catch((err) => console.warn('Could not restore the Jagex session:', err));

@@ -16,6 +16,11 @@ import javax.swing.SwingUtilities;
  */
 public class InputProbe {
     public static void main(String[] args) {
+        // Lets tests check which Jagex session RuneLite would have received,
+        // and that web-server secrets are not passed on.
+        System.out.println("env JX_DISPLAY_NAME=" + System.getenv("JX_DISPLAY_NAME")
+            + " RLWEB_PASSWORD=" + (System.getenv("RLWEB_PASSWORD") == null ? "absent" : "present"));
+        System.out.flush();
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("InputProbe");
             JPanel panel = new JPanel() {

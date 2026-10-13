@@ -11,12 +11,13 @@ import json
 import logging
 import os
 import secrets
-import signal
+import shlex
 import time
 from pathlib import Path
 
 from aiohttp import WSMsgType, web
 
+from supervisor import RuneLiteSupervisor, validate_session
 from xinput import XInput
 
 log = logging.getLogger("rlweb")
@@ -25,12 +26,13 @@ COOKIE_NAME = "rlweb_session"
 SESSION_TTL = 30 * 24 * 3600
 MAX_PROFILES_BYTES = 256 * 1024
 MAX_TEXT_LENGTH = 256
-PUBLIC_PATHS = {"/login", "/manifest.webmanifest", "/icon.svg"}
+PUBLIC_PATHS = {"/login", "/js/login.js", "/manifest.webmanifest", "/icon.svg"}
 WEAK_PASSWORDS = {"", "change-me", "changeme", "password"}
 
 CONFIG = web.AppKey("config", object)
 SECRET = web.AppKey("secret", bytes)
 LOGIN_LOCK = web.AppKey("login_lock", asyncio.Lock)
+SUPERVISOR = web.AppKey("supervisor", object)
 
 
 class Config:
@@ -43,7 +45,8 @@ class Config:
         self.vnc_host = env.get("RLWEB_VNC_HOST", "127.0.0.1")
         self.vnc_port = int(env.get("RLWEB_VNC_PORT", "5901"))
         self.display = env.get("DISPLAY", ":1")
-        self.runelite_pidfile = Path(env.get("RLWEB_RUNELITE_PIDFILE", "/tmp/runelite.pid"))
+        self.runelite_cmd = env.get("RUNELITE_CMD", "")
+        self.runelite_args = shlex.split(env.get("RUNELITE_ARGS", ""))
         self.secure_cookie = env.get("RLWEB_SECURE_COOKIE", "0") == "1"
         self.password = env.get("RLWEB_PASSWORD", "")
         # URL prefix when served under a path, e.g. "/kyle/" behind a reverse
@@ -111,6 +114,15 @@ async def headers_middleware(request, handler):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "same-origin")
     response.headers.setdefault("X-Frame-Options", "DENY")
+    # The page holds the player's Jagex session in browser storage, so only
+    # this server's own scripts may run and connect anywhere.
+    host = request.host
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        f"img-src 'self' data: blob:; connect-src 'self' ws://{host} wss://{host}; "
+        "base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+    )
     if request.path == "/" or request.path.endswith(".html"):
         response.headers.setdefault("Cache-Control", "no-cache")
     return response
@@ -261,23 +273,61 @@ async def put_profiles(request):
     return web.json_response({"ok": True})
 
 
+def supervisor_of(request):
+    supervisor = request.app[SUPERVISOR]
+    if supervisor is None:
+        raise web.HTTPServiceUnavailable(text="RuneLite is not managed by this server")
+    return supervisor
+
+
 async def restart_runelite(request):
-    """Stops RuneLite; the entrypoint's supervisor loop starts it again."""
-    pidfile = request.app[CONFIG].runelite_pidfile
-    try:
-        pid = int(pidfile.read_text().strip())
-        os.killpg(pid, signal.SIGTERM)
-    except (OSError, ValueError) as exc:
-        raise web.HTTPServiceUnavailable(text=f"RuneLite is not running: {exc}")
+    await supervisor_of(request).restart()
     return web.json_response({"ok": True})
 
 
-def create_app(config):
+async def session_status(request):
+    supervisor = supervisor_of(request)
+    return web.json_response({"active": supervisor.session is not None, "displayName": supervisor.display_name})
+
+
+async def set_session(request):
+    """Receives the Jagex session the player's device stores and restarts
+    RuneLite with it. Kept in memory only; never logged or written to disk."""
+    supervisor = supervisor_of(request)
+    if request.content_length is None or request.content_length > 64 * 1024:
+        raise web.HTTPRequestEntityTooLarge(64 * 1024, request.content_length or 0)
+    try:
+        session = validate_session(await request.json())
+    except ValueError as exc:
+        raise web.HTTPBadRequest(text=str(exc))
+    await supervisor.restart(session)
+    return web.json_response({"ok": True, "displayName": supervisor.display_name})
+
+
+async def clear_session(request):
+    await supervisor_of(request).restart(None)
+    return web.json_response({"ok": True})
+
+
+async def start_supervisor(app):
+    if app[SUPERVISOR] is not None:
+        app[SUPERVISOR].start()
+
+
+async def stop_supervisor(app):
+    if app[SUPERVISOR] is not None:
+        await app[SUPERVISOR].stop()
+
+
+def create_app(config, supervisor=None):
     config.data_dir.mkdir(parents=True, exist_ok=True)
     app = web.Application(middlewares=[headers_middleware, auth_middleware])
     app[CONFIG] = config
     app[SECRET] = session_key(load_secret(config.data_dir), config.password)
     app[LOGIN_LOCK] = asyncio.Lock()
+    app[SUPERVISOR] = supervisor
+    app.on_startup.append(start_supervisor)
+    app.on_cleanup.append(stop_supervisor)
     app.router.add_get("/login", login_page)
     app.router.add_post("/login", login_submit)
     app.router.add_post("/logout", logout)
@@ -287,6 +337,9 @@ def create_app(config):
     app.router.add_get("/api/profiles", get_profiles)
     app.router.add_put("/api/profiles", put_profiles)
     app.router.add_post("/api/runelite/restart", restart_runelite)
+    app.router.add_get("/api/runelite/session", session_status)
+    app.router.add_put("/api/runelite/session", set_session)
+    app.router.add_delete("/api/runelite/session", clear_session)
     if config.novnc_root.is_dir():
         app.router.add_static("/novnc/", config.novnc_root)
     app.router.add_static("/", config.web_root)
@@ -298,7 +351,8 @@ def main():
     config = Config()
     if config.password.lower() in WEAK_PASSWORDS:
         raise SystemExit("Set RLWEB_PASSWORD to a strong password before starting.")
-    web.run_app(create_app(config), host=config.host, port=config.port, access_log=None)
+    supervisor = RuneLiteSupervisor(config.runelite_cmd, config.runelite_args) if config.runelite_cmd else None
+    web.run_app(create_app(config, supervisor), host=config.host, port=config.port, access_log=None)
 
 
 if __name__ == "__main__":

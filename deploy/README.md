@@ -25,6 +25,9 @@ no matter how kylemair.com is hosted.
 
 ## 1. Pick the server
 
+The game server is the only part that costs anything. See
+[cheap and free options](#cheap-and-free-hosting) below.
+
 - **A home PC or mini-PC (recommended):** your friends' game traffic leaves from a
   home internet connection, like normal play. It must stay on.
 - **A VPS (cloud server):** simpler networking, but every account connects from a
@@ -94,20 +97,11 @@ plain HTML:
 2. Uses **Add to Home Screen** for a full-screen app.
 3. Logs in to OSRS on RuneLite's login screen.
 
-**Jagex Accounts** can't type a password into RuneLite. They need the session file
-described in the [main README](../README.md#logging-in-to-the-game): the friend creates
-`credentials.properties` on their own Windows or Mac PC, gives it to you, and you
-install it into their container:
-
-```sh
-docker compose -f deploy/compose.yml cp credentials.properties rl-sam:/data/home/.runelite/credentials.properties
-docker compose -f deploy/compose.yml exec -u root rl-sam chown runelite: /data/home/.runelite/credentials.properties
-docker compose -f deploy/compose.yml restart rl-sam
-```
-
-That file works like a password to their account. They should only give it to you if
-they trust you and your server. They can cancel it at any time with **End sessions** in
-their account settings on runescape.com.
+**Jagex Accounts** load their login once from their phone (⚙ Settings → **Jagex
+Account** → **Load credentials file**). The [main README](../README.md#logging-in-to-the-game)
+explains how to create that file on a Windows or Mac PC. The login stays on the friend's
+phone; your server only holds it in memory while their RuneLite runs and never saves it.
+You never need to handle it.
 
 ## Managing players
 
@@ -121,12 +115,52 @@ their account settings on runescape.com.
 
 ## Risks to understand before inviting people
 
-- **You hold their accounts.** Whoever controls the server can reach every player's
-  logged-in game. A Jagex Account session file is a working login. Keep the server
-  updated, keep `deploy/.env` private, and only host people who trust you.
+- **You can reach their accounts.** Logins stay on friends' phones, but while a friend
+  plays, their RuneLite runs on your server with their session in memory. Anyone with
+  admin access to the server could use it. Keep the server updated, keep
+  `deploy/.env` private, and only host people who trust you.
 - **Jagex's position.** RuneLite is an approved client, but Jagex hasn't said anything
   about streaming it from a shared server. Several accounts playing from the same IP
   (especially a data-centre IP) may draw extra scrutiny. Each friend accepts that risk
   for their own account. Never use this for anything automated.
 - **Bandwidth.** Each active player streams video. Expect a few Mbit/s each (an
   estimate), which matters on a home upload connection.
+
+## Cheap and free hosting
+
+There are two separate pieces:
+
+1. **The game server** (this project) needs a real machine that's always on.
+2. **The main kylemair.com site** is ordinary web pages and can be hosted for free.
+
+### Game server options
+
+| Option | Cost | Fits (estimate) | Catches |
+|---|---|---|---|
+| **A PC at home** (old laptop, mini-PC) | Free, plus electricity | Depends on the PC; a 4-core / 8 GB machine fits about 3–4 players | Must stay on. Needs ports 80/443 forwarded and dynamic DNS. Upload speed limits how many can stream at once |
+| **Oracle Cloud Always Free** (Ampere A1, ARM) | Free | 2 CPUs / 12 GB, about 1–2 players | Oracle halved the free A1 allowance to 2 OCPU / 12 GB in 2026. Oracle says it can reclaim Always Free instances that sit idle for 7 days. Data-centre IP. Sign-up needs a card; free capacity is sometimes unavailable |
+| **Hetzner Cloud CAX11 / CAX21** (ARM) | About €6 / €10.50 a month | 2 vCPU / 4 GB about 1–2 players; 4 vCPU / 8 GB about 3–4 | Data-centre IP. Prices rose in June 2026, and some reports say these plans have limited availability. Check before ordering |
+
+My recommendation is **a PC at home**. It's free, and your friends' accounts connect
+from a normal home internet connection instead of a data centre, which looks more like
+regular play to Jagex. This image runs on both x86 and ARM, so all three options work.
+
+The "players" numbers are rough estimates of how many people can play **at the same
+time**. Check real usage with `docker stats` once it's running.
+
+### No port forwarding?
+
+Cloudflare Tunnel can publish a home server without opening router ports, and it's
+free. But Cloudflare's terms restrict serving video on its free plans, and it's unclear
+whether a game stream counts. Don't rely on it for this. If your router can't forward
+ports, a cheap VPS is the simpler fix.
+
+### The main site and the domain
+
+- **Hosting the main site:** GitHub Pages, Cloudflare Pages and Netlify all host simple
+  sites for free and support custom domains. Point `kylemair.com` there, and point
+  `play.kylemair.com` at the game server (step 3).
+- **The domain:** `kylemair.com` doesn't currently resolve. If you don't own it yet,
+  registering a `.com` typically costs about $10–15 a year (check the registrar's
+  renewal price, not just the first year).
+- **Or skip the main site:** the landing page at `play.kylemair.com` works on its own.

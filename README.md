@@ -23,7 +23,8 @@ laptop or remote desktop does.
   desktop.
 - **Everything is saved:** RuneLite's settings, profiles and Plugin Hub plugins live in
   `~/.runelite` on a Docker volume. Touch and display settings are saved as named
-  profiles on the host, and each device remembers which profile it uses.
+  profiles on the host, and each device remembers which profile it uses. A Jagex
+  Account login stays on your phone.
 
 See [docs/feasibility.md](docs/feasibility.md) for why this streams the client instead
 of porting RuneLite to WebAssembly.
@@ -68,24 +69,26 @@ proxy with TLS (Caddy, nginx) also works, as long as it forwards WebSockets.
 
 - **Legacy (non-Jagex) accounts:** log in on RuneLite's login screen as usual.
 - **Jagex Accounts:** these normally log in through the Jagex Launcher, which runs on
-  Windows and macOS. RuneLite's
-  [documented developer option](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts)
-  can save the launcher's session for reuse:
+  Windows and macOS. Like the official mobile app, RuneLite Web keeps your login **on
+  your phone**. The server holds it only in memory while RuneLite runs and never saves
+  it to disk.
   1. On a Windows or Mac PC, open RuneLite's configure window (Windows: Start menu →
      *RuneLite (configure)*; macOS: run `RuneLite --configure`). Add
-     `--insecure-write-credentials` to **Client arguments** and save.
+     `--insecure-write-credentials` to **Client arguments** and save. This is RuneLite's
+     [documented option](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts).
   2. Start RuneLite once from the Jagex Launcher. This writes
-     `.runelite/credentials.properties`.
-  3. Copy that file to the server:
-     ```sh
-     docker compose cp credentials.properties runelite-web:/data/home/.runelite/credentials.properties
-     docker compose exec -u root runelite-web chown runelite: /data/home/.runelite/credentials.properties
-     ```
-  4. Remove the client argument on the PC again.
+     `credentials.properties` into your `.runelite` folder (`%USERPROFILE%\.runelite`
+     on Windows, `~/.runelite` on macOS).
+  3. Remove the client argument again, then send the file to your phone (AirDrop,
+     a cloud drive, or email to yourself), and delete the copies you no longer need.
+  4. On your phone, open ⚙ Settings → **Jagex Account** → **Load credentials file**.
+     RuneLite restarts already logged in.
 
-  Treat the file like a password: anyone who has it can log in to your account
-  without your password. You can revoke it at any time with **End sessions** in your
-  account settings on runescape.com.
+  After a server restart, opening the page logs RuneLite in again from your phone.
+  **Remove from this device** forgets the login on the phone and restarts RuneLite
+  logged out. The file works like a password: anyone who has it can play your account.
+  You can cancel it at any time with **End sessions** in your account settings on
+  runescape.com, then make a new one.
 
 ## Touch controls
 
@@ -130,7 +133,7 @@ untouched:
 | `RLWEB_PASSWORD` | (required) | Web login password |
 | `RLWEB_GEOMETRY` | `1280x720` | Starting virtual screen size; resize mode changes it to fit each device |
 | `RLWEB_SECURE_COOKIE` | `0` | Set to `1` when served over HTTPS |
-| `RUNELITE_ARGS` | (empty) | Extra launcher arguments |
+| `RUNELITE_ARGS` | (empty) | Extra launcher arguments (RuneLite never sees `RLWEB_*` variables) |
 | `RLWEB_PORT` | `8080` | Web server port inside the container |
 | `RLWEB_BASE_PATH` | `/` | URL prefix when a reverse proxy serves the app under a path (for example `/kyle/`) |
 
@@ -155,5 +158,7 @@ web/js/gestures.js    touch gesture engine (DOM-free, unit tested)
 web/js/keyboard.js    on-screen and physical keyboard handling
 web/js/profiles.js    profile storage (host + per-device choice)
 web/js/main.js        wiring: video, toolbar, settings
-scripts/entrypoint.sh starts Xvnc, the window manager, the server and RuneLite
+server/supervisor.py  runs RuneLite, restarts it, passes the device's Jagex session
+web/js/jagex.js       reads credentials.properties, keeps the session on the device
+scripts/entrypoint.sh starts Xvnc, the window manager and the server
 ```

@@ -113,6 +113,21 @@
         </fieldset>
 
         <fieldset>
+          <legend>Jagex Account</legend>
+          <p id="jagex-status" class="status-line">Not saved on this device.</p>
+          <div class="row">
+            <label class="button"
+              >Load credentials file<input id="jagex-file" type="file" accept=".properties,text/plain" hidden
+            /></label>
+            <button id="jagex-remove" type="button" hidden>Remove from this device</button>
+          </div>
+          <p class="hint">
+            Your login stays on this device, like the official app. The server only holds it in memory while RuneLite
+            runs. Legacy accounts can just log in on RuneLite's login screen instead.
+          </p>
+        </fieldset>
+
+        <fieldset>
           <legend>Manage</legend>
           <div class="row">
             <button id="settings-export" type="button">Export profiles</button>

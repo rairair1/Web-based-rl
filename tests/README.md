@@ -20,14 +20,13 @@ mv /tmp/package /tmp/novnc
 
 export HOME=/tmp/rlweb-home RLWEB_DATA=/tmp/rlweb-data RLWEB_PASSWORD=test-pass-123
 export RLWEB_WEB_ROOT="$PWD/web" RLWEB_NOVNC_ROOT=/tmp/novnc RLWEB_SERVER="$PWD/server/app.py"
-export RLWEB_RUNELITE_PIDFILE=/tmp/rlweb-runelite.pid
 export RUNELITE_CMD=java RUNELITE_ARGS="$PWD/tests/fixtures/InputProbe.java"
 scripts/entrypoint.sh > /tmp/rlweb-stack.log 2>&1 &
 ```
 
 Then run the end-to-end touch test. It emulates a phone in landscape and checks taps,
-long-press, drags, pinch, menu mode, Shift, the keyboard and profile saving against what
-InputProbe received:
+long-press, drags, pinch, menu mode, Shift, the keyboard, profile saving, and the Jagex
+session kept on the device against what InputProbe received:
 
 ```sh
 npm install --no-save playwright

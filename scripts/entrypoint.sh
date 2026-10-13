@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
-# Starts the virtual display, the web server and RuneLite, and keeps RuneLite
-# running. If the display or the web server dies the container exits, so the
+# Starts the virtual display and the web server, which runs RuneLite and keeps
+# it running. If the display or the web server dies the container exits, so the
 # container restart policy can bring everything back cleanly.
 set -euo pipefail
 
 export DISPLAY="${DISPLAY:-:1}"
 GEOMETRY="${RLWEB_GEOMETRY:-1280x720}"
 VNC_PORT="${RLWEB_VNC_PORT:-5901}"
-PIDFILE="${RLWEB_RUNELITE_PIDFILE:-/tmp/runelite.pid}"
-RUNELITE_CMD="${RUNELITE_CMD:-/opt/runelite/AppRun}"
-read -r -a RUNELITE_ARGS <<<"${RUNELITE_ARGS:-}"
+export RUNELITE_CMD="${RUNELITE_CMD:-/opt/runelite/AppRun}"
 
 mkdir -p "$HOME" "${RLWEB_DATA:-/data/rlweb}"
 
@@ -32,16 +30,6 @@ xdpyinfo >/dev/null 2>&1 || { echo "X display $DISPLAY did not start" >&2; exit 
 matchbox-window-manager -use_titlebar no &
 
 python3 "${RLWEB_SERVER:-/opt/rlweb/server/app.py}" &
-
-(
-  while true; do
-    echo "Starting RuneLite: $RUNELITE_CMD ${RUNELITE_ARGS[*]}"
-    setsid "$RUNELITE_CMD" "${RUNELITE_ARGS[@]}" &
-    echo $! >"$PIDFILE"
-    wait $! || echo "RuneLite exited with status $?"
-    sleep 2
-  done
-) &
 
 wait -n
 echo "A core process exited; stopping." >&2

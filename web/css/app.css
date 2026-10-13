@@ -253,6 +253,9 @@ select {
 .row.end {
   justify-content: flex-end;
 }
+.status-line {
+  margin: 4px 0;
+}
 .hint {
   margin: 6px 0 0;
   font-size: 13px;
